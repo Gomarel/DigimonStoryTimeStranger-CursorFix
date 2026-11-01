@@ -84,7 +84,7 @@ and remove the launch option.
 After the game starts, `DigimonCursorFix.log` appears next to the `.asi`:
 
 ```
-[14:46:03.162] DigimonCursorFix 1.0.0 — start
+[14:46:03.162] DigimonCursorFix 1.1.0 — start
 [14:46:03.162] Process:  S:\common\Digimon Story Time Stranger\Digimon Story Time Stranger.exe (PID 308)
 [14:46:03.163] INI:      S:\common\Digimon Story Time Stranger\DigimonCursorFix.ini (found)
 [14:46:03.163] Wine:     11.0
@@ -127,13 +127,17 @@ every option.
   The mouse still works everywhere the in-game cursor is visible.
 - **The mouse camera mode lets the re-centering through in the world.** In a test on Linux this caused no lag,
   but if the original lag comes back for you, use the default mode.
-- Mouse control of the Steam overlay (`Shift+Tab`) may not work, because the overlay runs inside the game process.
-  The overlay can still be used with the keyboard.
+- With the default settings, mouse control of the Steam overlay (`Shift+Tab`) may not work, because the overlay
+  runs inside the game process and the plugin reports a fake cursor position. The overlay can still be used with
+  the keyboard.
 
 ## Compatibility
 
-Tested on Linux (Wayland) with Proton (Wine 11.0) and Ultimate ASI Loader as `dinput8.dll`, using the default INI.
-The re-centering stopped on loads, location changes, battles, menus and dialogs.
+Tested on Linux (Wayland) with Proton (Wine 11.0) and Ultimate ASI Loader as `dinput8.dll`:
+
+- default settings: the cursor no longer jumps to the center on loads, location changes, battles, menus and dialogs,
+- `MouseCamera=1`: the mouse camera works smoothly, and the cursor returns to where it was left
+  (`MenuCursor=1`) or to the fixed position (`MenuCursor=2`) whenever a menu or battle opens.
 
 Not yet tested with the game on Windows or on the Steam Deck.
 
@@ -144,6 +148,9 @@ Please open an [issue](../../issues) and include:
 - `DigimonCursorFix.log`,
 - your OS, and your Proton version if you play on Linux,
 - what you did and what happened.
+
+For tricky problems, the plugin has a diagnostic mode that records in detail what the game does with the
+cursor. It is described in [DIAGNOSTICS.md](DIAGNOSTICS.md).
 
 This is a hobby project maintained in my spare time. I will look at issues when I can, but I cannot
 promise a timeline.

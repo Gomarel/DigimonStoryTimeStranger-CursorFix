@@ -35,7 +35,7 @@
 
 #pragma intrinsic(_ReturnAddress)
 
-#define CURSORFIX_VERSION "1.1.0-beta1"
+#define CURSORFIX_VERSION "1.1.0"
 
 namespace
 {
