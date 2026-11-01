@@ -9,9 +9,10 @@ the constant re-centering causes there.
 
 ## The problem
 
-The game keeps calling `SetCursorPos` to move the cursor to the center of the screen. It does this on every
-location change, battle load, menu and dialog window, in bursts of up to dozens of calls per second.
-The in-game cursor jumps along with it, so it keeps popping up in the middle of the screen right over the text.
+While you are in the world, the game calls `SetCursorPos` every frame to keep the cursor in the center of
+the screen (that is how its mouse camera works). When a menu or battle opens, the in-game cursor appears
+right where the system cursor is, which is always the center. So every time, the cursor pops up in the
+middle of the screen right over the text, no matter where you left it.
 
 ## What the plugin does
 
@@ -29,7 +30,21 @@ The in-game cursor still exists and still works: it follows the mouse, and menus
 used with it as usual. It just stays wherever you leave it. Move it to a corner once and it will not get in
 the way again.
 
-The one thing that stops working is turning the camera with the mouse (see [Known limitations](#known-limitations)).
+By default, the one thing that stops working is turning the camera with the mouse. If you want the mouse
+camera, use the mouse camera mode below.
+
+## Mouse camera mode
+
+Set `MouseCamera=1` in `DigimonCursorFix.ini` to keep the mouse camera working.
+
+The game has two modes. In the world it re-centers the cursor every frame and turns the camera by how far
+the mouse moved. In menus and battles it shows the in-game cursor instead. The cursor only "jumps to the
+center" because it is still sitting there from the camera mode when a menu opens.
+
+With `MouseCamera=1` the plugin lets the game re-center the cursor in the world, so the mouse camera works
+as usual. When a menu or battle opens, the plugin puts the cursor back where you left it the last time.
+With `MenuCursor=2` it puts the cursor on a fixed position instead (`MenuCursorX`/`MenuCursorY`, in percent
+of the game window).
 
 Every hook can be switched on or off in `DigimonCursorFix.ini` without rebuilding.
 
@@ -69,7 +84,7 @@ and remove the launch option.
 After the game starts, `DigimonCursorFix.log` appears next to the `.asi`:
 
 ```
-[14:46:03.162] DigimonCursorFix 1.0.0 — start
+[14:46:03.162] DigimonCursorFix 1.1.0 — start
 [14:46:03.162] Process:  S:\common\Digimon Story Time Stranger\Digimon Story Time Stranger.exe (PID 308)
 [14:46:03.163] INI:      S:\common\Digimon Story Time Stranger\DigimonCursorFix.ini (found)
 [14:46:03.163] Wine:     11.0
@@ -106,19 +121,34 @@ every option.
 
 ## Known limitations
 
-- **The camera cannot be turned with the mouse.** The game most likely implements mouse camera control by
+- **With the default settings, the camera cannot be turned with the mouse.** The game turns the camera by
   re-centering the cursor and measuring how far it moved, and that re-centering is exactly what the plugin
-  blocks. Turn the camera with the keyboard or a controller instead. The mouse still works everywhere the
-  in-game cursor is visible.
-- Mouse control of the Steam overlay (`Shift+Tab`) may not work, because the overlay runs inside the game process.
-  The overlay can still be used with the keyboard.
+  blocks. Turn the camera with the keyboard or a controller, or use the [mouse camera mode](#mouse-camera-mode).
+  The mouse still works everywhere the in-game cursor is visible.
+- **The mouse camera mode lets the re-centering through in the world.** In a test on Linux this caused no lag,
+  but if the original lag comes back for you, use the default mode.
+- With the default settings, mouse control of the Steam overlay (`Shift+Tab`) may not work, because the overlay
+  runs inside the game process and the plugin reports a fake cursor position. The overlay can still be used with
+  the keyboard.
 
 ## Compatibility
 
-Tested on Linux (Wayland) with Proton (Wine 11.0) and Ultimate ASI Loader as `dinput8.dll`, using the default INI.
-The re-centering stopped on loads, location changes, battles, menus and dialogs.
+Tested on Linux (Wayland) with Proton (Wine 11.0) and Ultimate ASI Loader as `dinput8.dll`:
+
+- default settings: the cursor no longer jumps to the center on loads, location changes, battles, menus and dialogs,
+- `MouseCamera=1`: the mouse camera works smoothly, and the cursor returns to where it was left
+  (`MenuCursor=1`) or to the fixed position (`MenuCursor=2`) whenever a menu or battle opens.
 
 Not yet tested with the game on Windows or on the Steam Deck.
+
+### Other games
+
+The plugin contains nothing specific to this game: no memory addresses, no file names, only hooks on standard
+Windows functions. It may therefore also help in other games that re-center the cursor the same way, for
+example older titles by the same developer such as *Digimon Story: Cyber Sleuth* or *Hacker's Memory*.
+This has not been tested, and other games are not supported here. If you want to try it, the
+[diagnostic mode](DIAGNOSTICS.md) quickly shows whether a game behaves the same way. Reports and forks
+for other games are welcome.
 
 ## Reporting issues
 
@@ -127,6 +157,9 @@ Please open an [issue](../../issues) and include:
 - `DigimonCursorFix.log`,
 - your OS, and your Proton version if you play on Linux,
 - what you did and what happened.
+
+For tricky problems, the plugin has a diagnostic mode that records in detail what the game does with the
+cursor. It is described in [DIAGNOSTICS.md](DIAGNOSTICS.md).
 
 This is a hobby project maintained in my spare time. I will look at issues when I can, but I cannot
 promise a timeline.
