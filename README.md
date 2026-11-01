@@ -25,8 +25,11 @@ The plugin uses [MinHook](https://github.com/TsudaKageyu/minhook) to intercept t
 | `GetCursorInfo` | reports the same fixed position as `GetCursorPos`, everything else stays real | on |
 | `ClipCursor`    | does nothing, so the game cannot lock the cursor inside its window       | off     |
 
-The in-game cursor still exists and still follows the mouse. It just stays wherever you leave it.
-Move it to a corner once and it will not get in the way again.
+The in-game cursor still exists and still works: it follows the mouse, and menus, buttons and dialogs can be
+used with it as usual. It just stays wherever you leave it. Move it to a corner once and it will not get in
+the way again.
+
+The one thing that stops working is turning the camera with the mouse (see [Known limitations](#known-limitations)).
 
 Every hook can be switched on or off in `DigimonCursorFix.ini` without rebuilding.
 
@@ -103,8 +106,10 @@ every option.
 
 ## Known limitations
 
-- The plugin is meant for keyboard play. The in-game cursor still follows the mouse, but playing with the mouse
-  has not been tested with the plugin active.
+- **The camera cannot be turned with the mouse.** The game most likely implements mouse camera control by
+  re-centering the cursor and measuring how far it moved, and that re-centering is exactly what the plugin
+  blocks. Turn the camera with the keyboard or a controller instead. The mouse still works everywhere the
+  in-game cursor is visible.
 - Mouse control of the Steam overlay (`Shift+Tab`) may not work, because the overlay runs inside the game process.
   The overlay can still be used with the keyboard.
 
