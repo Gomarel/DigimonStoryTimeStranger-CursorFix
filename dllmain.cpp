@@ -10,6 +10,14 @@
 //   - ShowCursor                    -> keeps the system cursor hidden (optional),
 //   - ClipCursor                    -> does nothing (optional, off by default).
 //
+// MouseCamera=1 (off by default) keeps the mouse camera working instead:
+// the game has two modes and calls one of these functions every frame —
+//   - camera mode (world):           SetCursorPos(center), the camera turns by the distance moved,
+//   - cursor mode (menus, battles):  ClipCursor(NULL), the in-game cursor follows the mouse.
+// The plugin lets the game re-center the cursor and only watches the switch between modes:
+// on entering cursor mode it puts the cursor back where it was left the last time
+// (or on a fixed position), so it no longer pops up in the center of the screen.
+//
 // Diagnostics (off by default):
 //   - Observe=1  -> the hooks only count and log, every call goes to the original function,
 //   - Trace=1    -> logs every SetCursorPos call with its caller, watches raw input,
@@ -27,7 +35,7 @@
 
 #pragma intrinsic(_ReturnAddress)
 
-#define CURSORFIX_VERSION "1.1.0-diag"
+#define CURSORFIX_VERSION "1.1.0-beta1"
 
 namespace
 {
@@ -39,6 +47,12 @@ namespace
     {
         Offscreen = 1,   // fixed position from the INI (OffscreenX/OffscreenY)
         WindowCenter = 2 // center of the game window's client area (fallback: Offscreen)
+    };
+
+    enum class MenuCursor : int
+    {
+        LastPosition = 1, // where the cursor was left the last time the in-game cursor was shown
+        FixedPosition = 2 // MenuCursorX/MenuCursorY, in percent of the game window
     };
 
     struct Config
@@ -53,6 +67,10 @@ namespace
         int        offscreenY = -9999;
         bool       log        = true;
         int        logIntervalSeconds = 10;
+        bool       mouseCamera = false;
+        MenuCursor menuCursor  = MenuCursor::LastPosition;
+        int        menuCursorX = 100; // percent of the game window width
+        int        menuCursorY = 100; // percent of the game window height
         bool       observe    = false;
         bool       trace      = false;
         int        markerKey  = 0; // virtual-key code, 0 = off
@@ -267,6 +285,16 @@ namespace
         g_config.observe    = IniInt(L"Observe", defaults.observe) != 0;
         g_config.trace      = IniInt(L"Trace", defaults.trace) != 0;
         g_config.markerKey  = IniInt(L"MarkerKey", defaults.markerKey);
+        g_config.mouseCamera = IniInt(L"MouseCamera", defaults.mouseCamera) != 0;
+
+        int menuCursor = IniInt(L"MenuCursor", static_cast<int>(defaults.menuCursor));
+        g_config.menuCursor = (menuCursor == static_cast<int>(MenuCursor::FixedPosition))
+                                  ? MenuCursor::FixedPosition
+                                  : MenuCursor::LastPosition;
+
+        auto percent = [](int value) { return value < 0 ? 0 : (value > 100 ? 100 : value); };
+        g_config.menuCursorX = percent(IniInt(L"MenuCursorX", defaults.menuCursorX));
+        g_config.menuCursorY = percent(IniInt(L"MenuCursorY", defaults.menuCursorY));
 
         int mode = IniInt(L"Mode", static_cast<int>(defaults.mode));
         g_config.mode = (mode == static_cast<int>(CursorMode::WindowCenter))
@@ -313,6 +341,105 @@ namespace
         return point;
     }
 
+    // Client area of the game window in screen coordinates — only when the game window is in the foreground.
+    bool GameWindowArea(RECT& area)
+    {
+        HWND window = GetForegroundWindow();
+        DWORD processId = 0;
+        if (window != nullptr)
+            GetWindowThreadProcessId(window, &processId);
+
+        RECT client;
+        POINT origin = { 0, 0 };
+        if (processId != GetCurrentProcessId() || !GetClientRect(window, &client) || !ClientToScreen(window, &origin))
+            return false;
+
+        area = { origin.x, origin.y, origin.x + client.right, origin.y + client.bottom };
+        return true;
+    }
+
+    // ---------------------------------------------------------------------
+    // MouseCamera=1: tracking the game's camera/cursor mode
+    // ---------------------------------------------------------------------
+
+    enum GameMode : LONG
+    {
+        ModeUnknown = 0,
+        ModeCamera  = 1, // world: SetCursorPos(center) every frame
+        ModeCursor  = 2  // menus, battles: ClipCursor(NULL) every frame
+    };
+
+    volatile LONG g_gameMode = ModeUnknown;
+    POINT g_menuCursor = { 0, 0 };
+    bool  g_menuCursorSaved = false;
+
+    // Called from the SetCursorPos hook, before the call goes to the original function.
+    void OnCameraModeFrame()
+    {
+        LONG previous = InterlockedExchange(&g_gameMode, ModeCamera);
+        if (previous == ModeCamera)
+            return;
+
+        // Leaving cursor mode: remember where the player left the cursor.
+        if (previous == ModeCursor)
+        {
+            g_menuCursor = RealCursorPosition();
+            g_menuCursorSaved = true;
+            Log("Mode: cursor -> camera, cursor left at %ld,%ld", g_menuCursor.x, g_menuCursor.y);
+        }
+        else
+        {
+            Log("Mode: camera");
+        }
+    }
+
+    // Called from the ClipCursor(NULL) hook, after the call went to the original function.
+    void OnCursorModeFrame()
+    {
+        LONG previous = InterlockedExchange(&g_gameMode, ModeCursor);
+        if (previous == ModeCursor)
+            return;
+
+        if (previous != ModeCamera)
+        {
+            Log("Mode: cursor");
+            return;
+        }
+
+        // Entering cursor mode from camera mode: the cursor sits in the center because of the camera.
+        RECT area;
+        if (!GameWindowArea(area))
+        {
+            Log("Mode: camera -> cursor, game window not in foreground, cursor not moved");
+            return;
+        }
+
+        POINT target;
+        if (g_config.menuCursor == MenuCursor::FixedPosition)
+        {
+            target.x = area.left + (area.right - area.left - 1) * g_config.menuCursorX / 100;
+            target.y = area.top + (area.bottom - area.top - 1) * g_config.menuCursorY / 100;
+        }
+        else if (g_menuCursorSaved)
+        {
+            target = g_menuCursor;
+        }
+        else
+        {
+            Log("Mode: camera -> cursor, no saved cursor position yet, cursor not moved");
+            return;
+        }
+
+        if (g_config.observe)
+        {
+            Log("Mode: camera -> cursor, would move cursor to %ld,%ld (Observe=1, not moved)", target.x, target.y);
+            return;
+        }
+
+        BOOL moved = o_SetCursorPos(target.x, target.y);
+        Log("Mode: camera -> cursor, cursor moved to %ld,%ld%s", target.x, target.y, moved ? "" : " (FAILED)");
+    }
+
     // ---------------------------------------------------------------------
     // Hooks
     // ---------------------------------------------------------------------
@@ -323,7 +450,8 @@ namespace
         if (g_config.trace)
             RecordCaller(g_callersGetCursorPos, "GetCursorPos", _ReturnAddress());
 
-        if (g_config.observe)
+        // The mouse camera measures how far the real cursor moved from the center.
+        if (g_config.observe || g_config.mouseCamera)
             return o_GetCursorPos(lpPoint);
 
         if (lpPoint == nullptr)
@@ -351,7 +479,10 @@ namespace
             Log("SetCursorPos(%d,%d) from %ld,%ld caller %s", x, y, from.x, from.y, where);
         }
 
-        if (g_config.observe)
+        if (g_config.mouseCamera)
+            OnCameraModeFrame();
+
+        if (g_config.observe || g_config.mouseCamera)
             return o_SetCursorPos(x, y);
 
         return TRUE; // pretend success, leave the cursor where it is
@@ -389,6 +520,14 @@ namespace
                 Log("ClipCursor(NULL)");
         }
 
+        if (g_config.mouseCamera)
+        {
+            BOOL result = o_ClipCursor(lpRect);
+            if (lpRect == nullptr)
+                OnCursorModeFrame();
+            return result;
+        }
+
         if (g_config.observe)
             return o_ClipCursor(lpRect);
 
@@ -400,7 +539,7 @@ namespace
         InterlockedIncrement(&g_cntGetCursorInfo);
 
         BOOL result = o_GetCursorInfo(pci);
-        if (result && pci != nullptr && !g_config.observe)
+        if (result && pci != nullptr && !g_config.observe && !g_config.mouseCamera)
             pci->ptScreenPos = FakeCursorPosition(); // keep the real flags/hCursor
         return result;
     }
@@ -493,6 +632,11 @@ namespace
         Log("Settings: Mode=%d OffscreenX=%d OffscreenY=%d LogIntervalSeconds=%d",
             static_cast<int>(g_config.mode), g_config.offscreenX, g_config.offscreenY,
             g_config.logIntervalSeconds);
+        if (g_config.mouseCamera)
+        {
+            Log("MouseCamera: on, MenuCursor=%d MenuCursorX=%d%% MenuCursorY=%d%%",
+                static_cast<int>(g_config.menuCursor), g_config.menuCursorX, g_config.menuCursorY);
+        }
         if (g_config.observe || g_config.trace || g_config.markerKey != 0)
         {
             Log("Diagnostics: Observe=%d Trace=%d MarkerKey=0x%02x%s",
@@ -596,11 +740,12 @@ namespace
         int installed = 0;
         if (g_config.hookGetCursorPos)
             installed += InstallHook("GetCursorPos", &Hook_GetCursorPos, &o_GetCursorPos);
-        if (g_config.hookSetCursorPos)
+        // MouseCamera=1 recognizes the game's mode from SetCursorPos and ClipCursor, so it needs both hooks.
+        if (g_config.hookSetCursorPos || g_config.mouseCamera)
             installed += InstallHook("SetCursorPos", &Hook_SetCursorPos, &o_SetCursorPos);
         if (g_config.hookShowCursor)
             installed += InstallHook("ShowCursor", &Hook_ShowCursor, &o_ShowCursor);
-        if (g_config.hookClipCursor)
+        if (g_config.hookClipCursor || g_config.mouseCamera)
             installed += InstallHook("ClipCursor", &Hook_ClipCursor, &o_ClipCursor);
         if (g_config.hookGetCursorInfo)
             installed += InstallHook("GetCursorInfo", &Hook_GetCursorInfo, &o_GetCursorInfo);

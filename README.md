@@ -9,9 +9,10 @@ the constant re-centering causes there.
 
 ## The problem
 
-The game keeps calling `SetCursorPos` to move the cursor to the center of the screen. It does this on every
-location change, battle load, menu and dialog window, in bursts of up to dozens of calls per second.
-The in-game cursor jumps along with it, so it keeps popping up in the middle of the screen right over the text.
+While you are in the world, the game calls `SetCursorPos` every frame to keep the cursor in the center of
+the screen (that is how its mouse camera works). When a menu or battle opens, the in-game cursor appears
+right where the system cursor is, which is always the center. So every time, the cursor pops up in the
+middle of the screen right over the text, no matter where you left it.
 
 ## What the plugin does
 
@@ -29,7 +30,21 @@ The in-game cursor still exists and still works: it follows the mouse, and menus
 used with it as usual. It just stays wherever you leave it. Move it to a corner once and it will not get in
 the way again.
 
-The one thing that stops working is turning the camera with the mouse (see [Known limitations](#known-limitations)).
+By default, the one thing that stops working is turning the camera with the mouse. If you want the mouse
+camera, use the mouse camera mode below.
+
+## Mouse camera mode
+
+Set `MouseCamera=1` in `DigimonCursorFix.ini` to keep the mouse camera working.
+
+The game has two modes. In the world it re-centers the cursor every frame and turns the camera by how far
+the mouse moved. In menus and battles it shows the in-game cursor instead. The cursor only "jumps to the
+center" because it is still sitting there from the camera mode when a menu opens.
+
+With `MouseCamera=1` the plugin lets the game re-center the cursor in the world, so the mouse camera works
+as usual. When a menu or battle opens, the plugin puts the cursor back where you left it the last time.
+With `MenuCursor=2` it puts the cursor on a fixed position instead (`MenuCursorX`/`MenuCursorY`, in percent
+of the game window).
 
 Every hook can be switched on or off in `DigimonCursorFix.ini` without rebuilding.
 
@@ -106,10 +121,12 @@ every option.
 
 ## Known limitations
 
-- **The camera cannot be turned with the mouse.** The game most likely implements mouse camera control by
+- **With the default settings, the camera cannot be turned with the mouse.** The game turns the camera by
   re-centering the cursor and measuring how far it moved, and that re-centering is exactly what the plugin
-  blocks. Turn the camera with the keyboard or a controller instead. The mouse still works everywhere the
-  in-game cursor is visible.
+  blocks. Turn the camera with the keyboard or a controller, or use the [mouse camera mode](#mouse-camera-mode).
+  The mouse still works everywhere the in-game cursor is visible.
+- **The mouse camera mode lets the re-centering through in the world.** In a test on Linux this caused no lag,
+  but if the original lag comes back for you, use the default mode.
 - Mouse control of the Steam overlay (`Shift+Tab`) may not work, because the overlay runs inside the game process.
   The overlay can still be used with the keyboard.
 

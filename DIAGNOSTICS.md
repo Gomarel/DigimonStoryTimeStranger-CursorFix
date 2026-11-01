@@ -13,6 +13,24 @@ The diagnostic build changes nothing in the game. It only records:
 - whether the game registers and reads raw mouse input,
 - numbered markers written when you press **F9**.
 
+## Findings (first run, Linux, Proton with Wine 11.0)
+
+The game has two modes and calls exactly one of these functions every frame:
+
+| Mode   | When                                    | Called every frame |
+|--------|-----------------------------------------|--------------------|
+| Camera | world, NPC dialogs                      | `SetCursorPos(960,540)` (center of a 1920×1080 window) |
+| Cursor | title screen, menus, battles, quitting  | `ClipCursor(NULL)` |
+
+- The switch happens within a single frame, and the two never overlap.
+- In camera mode, the camera turns by how far the cursor moved since the last frame (`GetCursorPos`
+  right after `SetCursorPos`). The game also reads raw mouse input.
+- All `SetCursorPos` calls come from one place in the game code.
+- The cursor "jumps to the center" in menus only because camera mode left it there.
+
+This led to the `MouseCamera=1` mode: the plugin lets the re-centering through and, on the first
+`ClipCursor(NULL)` after camera mode, puts the cursor back where it was when cursor mode last ended.
+
 ## Setup
 
 1. Close the game.
