@@ -141,6 +141,15 @@ Tested on Linux (Wayland) with Proton (Wine 11.0) and Ultimate ASI Loader as `di
 
 Not yet tested with the game on Windows or on the Steam Deck.
 
+### Other games
+
+The plugin contains nothing specific to this game: no memory addresses, no file names, only hooks on standard
+Windows functions. It may therefore also help in other games that re-center the cursor the same way, for
+example older titles by the same developer such as *Digimon Story: Cyber Sleuth* or *Hacker's Memory*.
+This has not been tested, and other games are not supported here. If you want to try it, the
+[diagnostic mode](DIAGNOSTICS.md) quickly shows whether a game behaves the same way. Reports and forks
+for other games are welcome.
+
 ## Reporting issues
 
 Please open an [issue](../../issues) and include:
