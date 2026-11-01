@@ -1,0 +1,3 @@
+MinHook v1.3.4 (commit c3fcafdc10146beb5919319d0683e44e3c30d537)
+https://github.com/TsudaKageyu/minhook
+Only include/, src/, LICENSE.txt and AUTHORS.txt were copied - unmodified.
